@@ -39,6 +39,7 @@ npx wrangler d1 create blog-db
 # 5. Run migrations + seed
 npm run db:migrate:local
 npm run db:migrate:geo:local
+npm run db:migrate:rating:local
 npm run db:seed:local
 
 # 6. Set production secrets (once):
@@ -60,6 +61,8 @@ npm run db:migrate:local      # initial migration on local D1
 npm run db:migrate:remote     # initial migration on remote D1
 npm run db:migrate:geo:local  # GEO fields migration (hero_image, key_takeaways, faq, reading_time)
 npm run db:migrate:geo:remote # GEO migration on remote D1
+npm run db:migrate:rating:local  # aggregate_rating migration (review/comparison schema)
+npm run db:migrate:rating:remote # aggregate_rating on remote D1
 npm run db:seed:local         # seed local (4 categories + 1 demo article)
 npm run db:seed:remote        # seed remote (production)
 ```
@@ -86,7 +89,7 @@ src/
     api/search.ts        # Public LIKE search (no auth)
     api/yt-transcript.ts # YouTube transcript extraction on the edge (Bearer)
     api/taxonomy.ts      # List categories + aggregated tags (Bearer)
-    artigos/[slug].astro # Article page (SSR, JSON-LD, breadcrumbs, related)
+    [slug].astro         # Article page (SSR, JSON-LD, breadcrumbs, related)
     categoria/[slug].astro
     index.astro          # Homepage with pagination + Preact search island
     sitemap.xml.ts       # Dynamic sitemap (D1 query)
@@ -123,13 +126,18 @@ worker-configuration.d.ts# Env types (bindings + vars + secrets)
   is served as a subdirectory (e.g. `example.com/blog`). The combination
   `base` + `trailingSlash: 'never'` breaks Astro's index route (404 on `/blog`);
   `ignore` + canonical tag consolidates SEO instead.
-- **`src/lib/paths.ts`** centralizes `url('/artigos/X')` → `/blog/artigos/X`. All
+- **`src/lib/paths.ts`** centralizes `url('/my-slug')` → `/blog/my-slug`. All
   internal `href`s and `fetch`es (including the Preact SearchIsland client-side)
   go through this helper. Changing the base path is a one-liner.
+- **Articles live at `/blog/{slug}`** (no `/artigos/` segment — removed in 04/2026
+  for shorter, cleaner URLs that LLMs cite better). `src/middleware.ts` issues
+  **301** redirects from `/blog/artigos/*` → `/blog/*`. `src/lib/slug.ts`
+  exports `isReservedSlug()` to reject slugs that collide with reserved
+  routes (`categoria`, `api`, `sitemap.xml`, the IndexNow key, etc.).
 
 ## GEO article skeleton
 
-Every article rendered at `/artigos/[slug]` follows the same structure so
+Every article rendered at `/blog/[slug]` follows the same structure so
 retrievers get well-delimited, citable chunks:
 
 1. **Breadcrumb** → `BreadcrumbList` schema
@@ -202,7 +210,7 @@ SLUG=$(curl -s -X POST "$BLOG_URL/api/articles" \
 curl -X POST "$BLOG_URL/api/publish/$SLUG" \
   -H "Authorization: Bearer $BLOG_KEY"
 
-echo "Published: $BLOG_URL/artigos/$SLUG"
+echo "Published: $BLOG_URL/$SLUG"
 ```
 
 Required fields on create: `title`, `summary`, `content`.

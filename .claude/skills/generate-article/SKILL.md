@@ -20,7 +20,10 @@ existe, ou quer só ver transcrição sem publicar.
 
 **Regra editorial inegociável (preferência do usuário):**
 - O artigo publicado pode citar vídeo **somente** quando o vídeo for do
-  canal oficial da Techify no YouTube.
+  canal oficial da própria marca no YouTube — definido por
+  `$ORG_YT_HANDLE` / `$ORG_YT_CHANNEL_ID` no `wrangler.toml`. Se essas
+  vars estiverem vazias, **nenhum link de YouTube é permitido** no
+  artigo.
 - Para vídeos de canais terceiros: não mencionar vídeo-fonte e não incluir
   links externos de terceiros.
 - Links da própria marca e links internos do blog continuam permitidos.
@@ -42,10 +45,11 @@ proprietários** abaixo, senão o artigo não passa do checklist:
    onde X tem furo, exagero ou aplicação restrita? Articule isso.
    Ex.: vídeo diz "DeepSeek V4 mata GPT-5" → artigo argumenta que mata só
    em coding agentic com janela > 200k, mas perde em multimodal.
-2. **Experiência interna da Techify**: "Em projetos da Techify, vimos
-   que…", "Auditorias internas mostram que…", "Em 8 implementações
-   recentes, …". Não pode ser inventado — se o agente não tem esse
-   dado, pula este ângulo, mas precisa compensar nos outros 4.
+2. **Experiência interna da marca (`$ORG_NAME`)**: "Em projetos da
+   $ORG_NAME, vimos que…", "Auditorias internas mostram que…", "Em 8
+   implementações recentes, …". Não pode ser inventado — se o agente
+   não tem esse dado, pula este ângulo, mas precisa compensar nos
+   outros 4.
 3. **Dado/comparação que a fonte não tem**: benchmark cruzado, tabela
    comparativa que ninguém fez ainda, custo total de propriedade
    calculado, breakeven, projeção de adoção. Tem que ser específico e
@@ -53,7 +57,7 @@ proprietários** abaixo, senão o artigo não passa do checklist:
 4. **Aplicação prática que a fonte não cobriu**: "Como aplicar isso em
    PME brasileira de e-commerce", "Como medir ROI disso em time de 5
    devs", "Implementação em arquitetura serverless na Cloudflare".
-   Aterrissa o tema no público da Techify.
+   Aterrissa o tema no público da marca.
 5. **Risco/armadilha que a fonte minimizou**: vídeos de hype omitem
    trade-offs. Liste 2-3 armadilhas reais (custo escondido,
    dependência, lock-in, problema de governança, falha de escala).
@@ -71,17 +75,43 @@ tudo". Hype é genérico e não-citável; tese específica é citável.
 
 ## Pré-requisitos
 
-Antes de qualquer curl, carregue as credenciais:
+Antes de qualquer curl, carregue as credenciais da API:
 
 ```bash
 set -a; source .env; set +a
 ```
 
-Variáveis esperadas: `$BLOG_URL`, `$BLOG_KEY`.
+Variáveis esperadas em `.env`: `$BLOG_URL`, `$BLOG_KEY`.
 
-Além disso, o nome da marca editorial usado nos CTAs e na persona padrão
-é lido das vars do projeto — use o valor de `SITE_NAME` / `ORG_URL` /
-`DEFAULT_AUTHOR_NAME` configurado no `wrangler.toml` local ao gerar copy.
+A skill é **agnóstica de marca** — toda identidade editorial é lida do
+`wrangler.toml` local. Antes de gerar copy, extraia as vars relevantes:
+
+```bash
+SITE_NAME=$(grep '^SITE_NAME' wrangler.toml | head -1 | cut -d'"' -f2)
+SITE_URL=$(grep '^SITE_URL' wrangler.toml | head -1 | cut -d'"' -f2)
+ORG_NAME=$(grep '^ORG_NAME' wrangler.toml | head -1 | cut -d'"' -f2)
+ORG_URL=$(grep '^ORG_URL' wrangler.toml | head -1 | cut -d'"' -f2)
+DEFAULT_AUTHOR_NAME=$(grep '^DEFAULT_AUTHOR_NAME' wrangler.toml | head -1 | cut -d'"' -f2)
+ORG_YT_HANDLE=$(grep '^ORG_YT_HANDLE' wrangler.toml | head -1 | cut -d'"' -f2)
+ORG_YT_CHANNEL_ID=$(grep '^ORG_YT_CHANNEL_ID' wrangler.toml | head -1 | cut -d'"' -f2)
+```
+
+Como a skill consome cada var:
+
+| Var | Onde aparece |
+|---|---|
+| `SITE_NAME` | sufixo de `meta_title` ("Título \| $SITE_NAME"), CTA da conclusão |
+| `SITE_URL` | base canônica do blog (já refletida em `$BLOG_URL`) |
+| `ORG_NAME` | menções brand-adjacent no corpo ("Na $ORG_NAME, observamos…"), brand-adjacency da regra editorial |
+| `ORG_URL` | href dos CTAs (`<a href="$ORG_URL">`); domínio próprio da política de links derivado do hostname dessa URL |
+| `DEFAULT_AUTHOR_NAME` | campo `author_name` do payload (a menos que o usuário peça outro) |
+| `ORG_YT_HANDLE` | referência human-readable no texto quando link de vídeo é permitido |
+| `ORG_YT_CHANNEL_ID` | validação `channelId == $ORG_YT_CHANNEL_ID` antes de aceitar link de YouTube |
+
+**Defaults de segurança:**
+- Se `ORG_NAME` vazio → usa `SITE_NAME` como fallback (mesmo comportamento de `src/lib/site.ts`).
+- Se `ORG_YT_CHANNEL_ID` vazio → **bloqueia todo link de YouTube**, inclusive da própria marca. Não há "fail-open".
+- Se `ORG_URL` vazio → CTAs não emitem link externo; aponta só para a home do blog.
 
 ---
 
@@ -212,8 +242,12 @@ EOF
 1. **Corrigir o nome do projeto/produto em todo o artigo** (o nome
    correto quase sempre está no título do vídeo ou na descrição, não
    na transcrição).
-2. **Usar o título real do vídeo como referência interna**, e só citar o vídeo no artigo final se for do canal oficial da Techify.
-3. **Validar o canal antes de linkar:** aceitar link de vídeo apenas quando o `canonical`/`channelId` corresponder ao canal oficial Techify (`@techifyone`, canal `UCtVIxwOvpe-OlgMqGBtj5Kg`).
+2. **Usar o título real do vídeo como referência interna**, e só citar
+   o vídeo no artigo final se o `channelId` extraído do HTML bater com
+   `$ORG_YT_CHANNEL_ID`. Se essa var estiver vazia, o vídeo nunca pode
+   ser citado nem linkado.
+3. **Validar o canal antes de linkar:** extraia o `channelId` do HTML
+   (campo `"channelId":"..."` ou tag `<link itemprop="url" href="https://www.youtube.com/channel/...">`) e compare igual literal com `$ORG_YT_CHANNEL_ID`. Match exato — sem fuzzy.
 
 **WebFetch geralmente não traz a descrição** — o YouTube serve quase
 nada na resposta server-side para o scraper do WebFetch. Sempre vá
@@ -224,23 +258,30 @@ direto via `curl` + User-Agent de navegador, como acima.
 **Links externos de terceiros são bloqueados por padrão.**
 
 Exceção permitida:
-- Link de vídeo do YouTube **somente** quando o vídeo for do canal oficial
-  da Techify (`@techifyone` / `UCtVIxwOvpe-OlgMqGBtj5Kg`).
+- Link de vídeo do YouTube **somente** quando o `channelId` do vídeo
+  bater com `$ORG_YT_CHANNEL_ID` configurado em `wrangler.toml`. Se
+  `$ORG_YT_CHANNEL_ID` estiver vazio, todo link de YouTube fica
+  bloqueado.
 
 Regras:
-- Permitido: links da própria marca (`techify.one`, `techify.com.br`),
-  links internos do blog e link de vídeo YouTube da Techify (validado).
+- Permitido: links do **domínio próprio** (derivado do hostname de
+  `$ORG_URL` — ex.: se `$ORG_URL=https://acme.com`, então `acme.com` e
+  qualquer subdomínio `*.acme.com` estão liberados), links internos do
+  blog (path relativo `/blog/...`) e link de vídeo YouTube da própria
+  marca (validado contra `$ORG_YT_CHANNEL_ID`).
 - Proibido: YouTube de terceiros, GitHub, docs de fornecedores, redes
-  sociais, afiliados, patrocinadores, encurtadores e qualquer domínio de
-  terceiro.
+  sociais, afiliados, patrocinadores, encurtadores e qualquer domínio
+  de terceiro.
 - Se o vídeo mencionar ferramentas externas, cite apenas o nome no texto
   corrido, sem transformar em link.
 - Não crie seção "Links úteis".
 
 Validação recomendada do canal:
-1. Buscar `https://www.youtube.com/watch?v=VIDEO_ID`
-2. Ler `<link rel="canonical" ...>` ou `channelId` no HTML
-3. Só permitir link se bater com o canal oficial Techify
+1. Buscar `https://www.youtube.com/watch?v=VIDEO_ID` (passo 2.1).
+2. Extrair `channelId` do HTML (campo JSON `"channelId":"UC..."` é o
+   mais confiável; `<link itemprop="url" href="https://www.youtube.com/channel/UC...">` também serve).
+3. Só permitir link se `channelId == $ORG_YT_CHANNEL_ID` (igualdade
+   literal). Em qualquer outro caso, descartar a citação do vídeo.
 
 ### 2.3. Política de internal linking (regra editorial obrigatória)
 
@@ -279,8 +320,11 @@ curl -s "$BLOG_URL/api/taxonomy" -H "Authorization: Bearer $BLOG_KEY"
 ```
 
 **Regras inegociáveis:**
-- Categorias canônicas (seed): `ia-fundamentos`, `tutoriais`, `arquitetura`,
-  `novidades`. **Não invente nova categoria.** Escolha a mais próxima.
+- **Use apenas as categorias retornadas por `/api/taxonomy`. Nunca invente
+  categoria nova** — escolha a mais próxima do tema. (No seed default
+  deste repo as categorias são `ia-fundamentos`, `tutoriais`,
+  `arquitetura`, `novidades`, mas seu fork pode ter outras: sempre
+  confira a taxonomy ao vivo antes de decidir.)
 - Tags: **reuse as existentes** quando o assunto casar. Só crie nova se
   realmente não houver equivalente. Evite duplicatas ("cache"/"caches",
   "ia"/"ia-fundamentos").
@@ -310,8 +354,8 @@ priorizando nesta ordem:
 
 1. **Mesmo subtema/produto** (artigo sobre Claude Code linka pra outros
    sobre Claude Code; artigo sobre n8n linka pra outros n8n).
-2. **Mesma categoria** (`ia-fundamentos`, `tutoriais`, `arquitetura`,
-   `novidades`).
+2. **Mesma categoria** (qualquer slug de categoria existente — confira
+   `/api/taxonomy`).
 3. **Tags em comum** com o que você vai usar.
 4. **Conceito explicado por outro artigo** (ex.: artigo novo cita
    "agentes" → linka pro artigo que explica agentes).
@@ -348,7 +392,7 @@ vídeo:
 ```
 TESE EM 1 FRASE: ____ (o que este artigo afirma que outros não dizem)
 ÂNGULO 1 (tese contrária ou recorte): ____
-ÂNGULO 2 (experiência Techify, OU dado proprietário): ____
+ÂNGULO 2 (experiência da marca $ORG_NAME, OU dado proprietário): ____
 ÂNGULO 3 (aplicação prática para o público): ____
 ÂNGULO 4 (risco/armadilha minimizado pela fonte): ____
 DADO NOVO QUE TRAGO: ____ (comparação, número, projeção)
@@ -393,7 +437,7 @@ introdução + seções numeradas + tabela comparativa (quando faz sentido)
    - **Parágrafo-ângulo próprio:** análise, recorte, contraponto ou
      dado proprietário que a fonte original não tem. Aqui é onde a
      tese aparece — sem este parágrafo, a seção é derivativa.
-     Padrões válidos: "Na Techify, observamos que…", "O que a maioria
+     Padrões válidos: "Na $ORG_NAME, observamos que…", "O que a maioria
      dos posts não menciona é…", "O recorte que muda na prática é…",
      "Diferente do que a comunicação oficial sugere, …".
    - **Parágrafo-aplicação:** como fazer certo / como aplicar /
@@ -566,13 +610,13 @@ filtrado; copy específico + branded é preferido.
    mais contexto.
 
 2. **Brand-adjacency natural (≥ 3 menções citáveis da marca no corpo,
-   fora de CTAs).** Em pelo menos 3 parágrafos, mencione a marca em
+   fora de CTAs).** Em pelo menos 3 parágrafos, mencione `$ORG_NAME` em
    **contexto técnico/experiencial**, não em contexto de venda:
 
-   - "Na [marca], observamos que…" (experiência coletiva)
-   - "A [marca] recomenda…" (posicionamento)
-   - "Em auditorias da [marca], 8 em cada 10…" (dado interno)
-   - "Projetos que implementamos na [marca] mostram…"
+   - "Na $ORG_NAME, observamos que…" (experiência coletiva)
+   - "A $ORG_NAME recomenda…" (posicionamento)
+   - "Em auditorias da $ORG_NAME, 8 em cada 10…" (dado interno)
+   - "Projetos que implementamos na $ORG_NAME mostram…"
 
    **Não conta:** menção dentro de `<aside class="cta-inline">` (já
    tem sua função). O retriever cita o parágrafo inteiro — se a marca
@@ -593,7 +637,7 @@ filtrado; copy específico + branded é preferido.
 
 4. **Proibido abertura conversacional de parágrafo.** Retriever corta
    frases como "Bom, vamos entender…", "Agora que…", "Primeiro, note
-   que…". Comece com o fato. A construção "Na [marca], …" é permitida
+   que…". Comece com o fato. A construção "Na $ORG_NAME, …" é permitida
    porque ancora a marca.
 
 **HTML válido permitido:** `<h2>`, `<h3>`, `<p>`, `<pre><code>`,
@@ -859,8 +903,8 @@ curta, 3-5 linhas.
 - [ ] Pré-rascunho do passo 4.1 preenchido com TESE, ÂNGULOS, DADO NOVO
       e DECISÃO acionável — sem itens vagos
 - [ ] ≥ 3 dos 5 ângulos proprietários presentes no corpo (tese contrária,
-      experiência Techify, dado/comparação novo, aplicação prática para o
-      público, risco minimizado pela fonte)
+      experiência interna da marca `$ORG_NAME`, dado/comparação novo,
+      aplicação prática para o público, risco minimizado pela fonte)
 - [ ] ≥ 2 das seções H2 carregam tese forte (defendem posição, não só
       descrevem). Não pode ser sequência de "X é Y, X faz Z".
 - [ ] **Teste de derivatividade:** removendo o nome do produto/projeto
@@ -878,15 +922,17 @@ curta, 3-5 linhas.
       ou com a descrição (não com a transcrição, que tem erros de ASR)
 - [ ] Não incluiu links externos de terceiros no `content` (somente links
       da marca/domínio próprio e links internos do blog)
-- [ ] Se houver link de vídeo YouTube no artigo, validou que é do canal
-      oficial Techify (`@techifyone` / `UCtVIxwOvpe-OlgMqGBtj5Kg`); caso
-      contrário, removeu o link e a citação do vídeo
+- [ ] Se houver link de vídeo YouTube no artigo, validou que o
+      `channelId` extraído do HTML bate com `$ORG_YT_CHANNEL_ID`
+      configurado em `wrangler.toml`. Se a var estiver vazia, nenhum
+      link YT pode aparecer — removeu o link e a citação do vídeo.
 
 **Estrutura:**
 - [ ] `content` tem 7 a 10 seções numeradas em H2
 - [ ] Primeiras 2 frases do `content` têm uma estatística + uma promessa
-- [ ] Introdução só cita vídeo quando ele for do canal oficial Techify;
-      para canais terceiros, sem citação de vídeo nem link externo
+- [ ] Introdução só cita vídeo quando o `channelId` bater com
+      `$ORG_YT_CHANNEL_ID`; para canais terceiros (ou se a var estiver
+      vazia), sem citação de vídeo nem link externo
 - [ ] Pelo menos 1 `<table class="comparison">` quando o tema permite
 - [ ] Conclusão termina com CTA para a marca
 
@@ -958,7 +1004,7 @@ curta, 3-5 linhas.
 - ❌ Aceitar a fonte como neutra. Vídeos de creators/produtos têm
      viés de hype; release oficial omite trade-offs. Sempre adicione
      o contraponto/recorte que está faltando.
-- ❌ Inventar "experiência da Techify" quando ela não existe.
+- ❌ Inventar "experiência da $ORG_NAME" quando ela não existe.
      Honestidade > brand-adjacency falsa. Se não tem dado interno
      sobre o tema, compense com análise/comparação proprietária.
 - ❌ Copiar trechos literais da transcrição (ASR errado + baixa
@@ -968,8 +1014,9 @@ curta, 3-5 linhas.
      próprios com frequência ("WatsBot" vs "WhatsBot")
 - ❌ Incluir link externo de terceiro (GitHub, docs de fornecedor,
      redes sociais, afiliados, patrocinadores etc.) no corpo do artigo
-- ❌ Incluir link de YouTube de canal terceiro (só pode YouTube do canal
-     oficial Techify, após validação de `canonical`/`channelId`)
+- ❌ Incluir link de YouTube de canal terceiro (só pode YouTube do
+     canal cujo `channelId` bate com `$ORG_YT_CHANNEL_ID`; se a var
+     estiver vazia, nenhum link YT é permitido)
 - ❌ Criar seção "Links úteis" no final do artigo — cada link entra
      em contexto natural dentro do corpo
 - ❌ Publicar o artigo sem rodar o passo 9.5 (backlink pass). Artigo
@@ -996,6 +1043,12 @@ curta, 3-5 linhas.
 
 ## Exemplo condensado (referência)
 
+> **Nota:** o exemplo abaixo usa `Acme` como nome de marca placeholder e
+> `https://example.com` como `$ORG_URL` placeholder — os mesmos defaults
+> de `wrangler.toml.example`. Ao executar a skill de verdade, substitua
+> ambos pelos valores lidos de `$ORG_NAME` e `$ORG_URL` no
+> `wrangler.toml` local.
+
 ```json
 {
   "title": "Cache Redis em APIs: guia completo para 2026",
@@ -1004,7 +1057,7 @@ curta, 3-5 linhas.
   "meta_description": "Implemente cache Redis em APIs sem quebrar consistência. Estratégias de TTL, invalidação e padrões de produção. Veja o guia completo.",
   "category": "tutoriais",
   "tags": ["redis", "cache", "api", "performance"],
-  "content": "<p>Mais de 60% das APIs em produção rodam sem cache em camada, gerando latência evitável e custo de banco dobrado, segundo survey da StackOverflow 2025. Este guia mostra como implementar cache Redis em APIs sem introduzir bugs de consistência, passo a passo.</p><p>Este guia foi estruturado a partir de apuração técnica e experiência prática em implementação.</p><h2>Por que APIs sem cache são caras</h2><p>APIs sem cache pagam a mesma query no banco em cada request, mesmo quando o resultado não muda em minutos. <span class=\"stat-callout\"><strong>80%</strong> das queries em uma API típica read-heavy podem sair do banco e ir para um cache em memória.</span> Na Techify, observamos que times subestimam esse custo até a conta do banco explodir em produção.</p><h2>Passo 1: Identificar queries cacheáveis</h2><p>Queries cacheáveis são aquelas cujo resultado muda raramente e é consultado com frequência — leitura de perfil, configurações, catálogos. Projetos que implementamos na Techify mostram que essas três categorias respondem por 60% a 80% do tráfego de leitura de uma API típica.</p><h2>Passo 2: Definir TTL e política de invalidação</h2><p>TTL sozinho não basta para dados que mudam com eventos de escrita. A regra é: TTL curto (30–300s) como safety net + invalidação ativa no caminho de escrita.</p><h2>Passo 3: Implementar cache aside</h2><p>O padrão cache aside funciona em três passos: tenta ler do cache, se miss consulta o banco, popula o cache com TTL. É o mais simples e cobre 90% dos casos em produção.</p><aside class=\"cta-inline\"><h3>Sua API está cara sem cache?</h3><p>A Techify audita padrões de acesso, propõe estratégia por domínio e implementa observabilidade de cache em produção.</p><p><a href=\"https://techify.one\">Agende um diagnóstico</a></p></aside><h2>Passo 4: Invalidação ativa no caminho de escrita</h2><p>...</p><h2>Passo 5: Observabilidade de hit rate</h2><p>...</p><h2>Passo 6: Comparação de estratégias</h2><table class=\"comparison\"><thead><tr><th>Estratégia</th><th>Latência</th><th>Consistência</th><th>Complexidade</th></tr></thead><tbody><tr><td>Cache aside</td><td>Baixa</td><td>Eventual</td><td>Baixa</td></tr><tr><td>Write-through</td><td>Média</td><td>Forte</td><td>Média</td></tr><tr><td>Write-behind</td><td>Muito baixa</td><td>Fraca</td><td>Alta</td></tr></tbody></table><p class=\"urgency-note\">Cada semana sem uma política de cache formalizada significa custo de banco subindo e p95 instável, enquanto concorrentes consolidam latência sub-100ms em AI Overviews.</p><h2>Passo 7: Validação com canary</h2><p>...</p><aside class=\"cta-inline\"><h3>Cache em produção sem risco</h3><p>Revisamos sua política de invalidação antes do rollout completo.</p><p><a href=\"https://techify.one\">Fale com um especialista</a></p></aside><h2>Conclusão</h2><p>Um cache bem projetado reduz latência p95 em até 10x e corta 80% das queries no banco. Se sua aplicação tem mais de alguns milhares de requests por minuto, fale com a Techify sobre arquitetura de cache em produção.</p>",
+  "content": "<p>Mais de 60% das APIs em produção rodam sem cache em camada, gerando latência evitável e custo de banco dobrado, segundo survey da StackOverflow 2025. Este guia mostra como implementar cache Redis em APIs sem introduzir bugs de consistência, passo a passo.</p><p>Este guia foi estruturado a partir de apuração técnica e experiência prática em implementação.</p><h2>Por que APIs sem cache são caras</h2><p>APIs sem cache pagam a mesma query no banco em cada request, mesmo quando o resultado não muda em minutos. <span class=\"stat-callout\"><strong>80%</strong> das queries em uma API típica read-heavy podem sair do banco e ir para um cache em memória.</span> Na Acme, observamos que times subestimam esse custo até a conta do banco explodir em produção.</p><h2>Passo 1: Identificar queries cacheáveis</h2><p>Queries cacheáveis são aquelas cujo resultado muda raramente e é consultado com frequência — leitura de perfil, configurações, catálogos. Projetos que implementamos na Acme mostram que essas três categorias respondem por 60% a 80% do tráfego de leitura de uma API típica.</p><h2>Passo 2: Definir TTL e política de invalidação</h2><p>TTL sozinho não basta para dados que mudam com eventos de escrita. A regra é: TTL curto (30–300s) como safety net + invalidação ativa no caminho de escrita.</p><h2>Passo 3: Implementar cache aside</h2><p>O padrão cache aside funciona em três passos: tenta ler do cache, se miss consulta o banco, popula o cache com TTL. É o mais simples e cobre 90% dos casos em produção.</p><aside class=\"cta-inline\"><h3>Sua API está cara sem cache?</h3><p>A Acme audita padrões de acesso, propõe estratégia por domínio e implementa observabilidade de cache em produção.</p><p><a href=\"https://example.com\">Agende um diagnóstico</a></p></aside><h2>Passo 4: Invalidação ativa no caminho de escrita</h2><p>...</p><h2>Passo 5: Observabilidade de hit rate</h2><p>...</p><h2>Passo 6: Comparação de estratégias</h2><table class=\"comparison\"><thead><tr><th>Estratégia</th><th>Latência</th><th>Consistência</th><th>Complexidade</th></tr></thead><tbody><tr><td>Cache aside</td><td>Baixa</td><td>Eventual</td><td>Baixa</td></tr><tr><td>Write-through</td><td>Média</td><td>Forte</td><td>Média</td></tr><tr><td>Write-behind</td><td>Muito baixa</td><td>Fraca</td><td>Alta</td></tr></tbody></table><p class=\"urgency-note\">Cada semana sem uma política de cache formalizada significa custo de banco subindo e p95 instável, enquanto concorrentes consolidam latência sub-100ms em AI Overviews.</p><h2>Passo 7: Validação com canary</h2><p>...</p><aside class=\"cta-inline\"><h3>Cache em produção sem risco</h3><p>Revisamos sua política de invalidação antes do rollout completo.</p><p><a href=\"https://example.com\">Fale com um especialista</a></p></aside><h2>Conclusão</h2><p>Um cache bem projetado reduz latência p95 em até 10x e corta 80% das queries no banco. Se sua aplicação tem mais de alguns milhares de requests por minuto, fale com a Acme sobre arquitetura de cache em produção.</p>",
   "key_takeaways": [
     "Identifique queries read-heavy cujo resultado muda raramente — são as melhores candidatas a cache, cortando até 80% da carga no banco.",
     "Defina <strong>TTL curto + invalidação ativa</strong> para dados que mudam: TTL sozinho gera dados stale em picos de escrita.",

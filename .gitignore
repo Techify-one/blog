@@ -27,3 +27,6 @@ Thumbs.db
 # cloudflare
 .dev.vars
 wrangler.toml
+
+# claude code
+.claude/settings.local.json

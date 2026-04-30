@@ -157,7 +157,6 @@ Variáveis esperadas em `.env`:
 - `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` — deploy via wrangler
 - `SITE_HOST` — usado pelo `astro.config.mjs` como `site` em build-time
 - `BLOG_URL`, `BLOG_KEY` — chamadas à API do blog
-- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` — notificação de artigo publicado (ver seção abaixo)
 
 Carregue antes de rodar comandos:
 
@@ -354,32 +353,3 @@ criar draft → publicar → IndexNow) com as regras de copy que fazem o
 artigo ser citado por Google AI Overviews, Perplexity e ChatGPT Search.
 
 Não re-narre os passos aqui — siga o `SKILL.md` à risca.
-
-## Notificação Telegram após publicação
-
-**Sempre que um artigo for publicado com sucesso** (resposta `ok: true`
-do endpoint `POST /api/publish/{slug}`), envie uma mensagem para o
-Telegram do usuário usando as credenciais em `.env`:
-
-```bash
-set -a; source .env; set +a
-curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"chat_id\": ${TELEGRAM_CHAT_ID},
-    \"text\": \"Novo artigo publicado no blog Techify\n\n<TÍTULO>\n\n<URL>\",
-    \"disable_web_page_preview\": false
-  }"
-```
-
-Regras:
-
-- Aciona na publicação de **qualquer** artigo (draft → published e
-  republicações).
-- Substitua `<TÍTULO>` pelo título real e `<URL>` pelo campo `url`
-  retornado em `/api/publish/{slug}`.
-- Se `TELEGRAM_BOT_TOKEN` ou `TELEGRAM_CHAT_ID` não estiverem no `.env`,
-  pule o envio silenciosamente (não falhe a publicação por causa da
-  notificação).
-- Não é preciso pedir confirmação ao usuário — já está autorizado em
-  durable instruction aqui.

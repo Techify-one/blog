@@ -41,6 +41,14 @@ ORG_LOGO_URL = "https://example.com/logo.png"
 # Ex.: "https://www.linkedin.com/company/acme|https://x.com/acme|https://github.com/acme"
 ORG_SAME_AS = ""
 ORG_DESCRIPTION = "Short description of your organization."
+# YouTube channel of the brand — used by the generate-article skill to
+# validate whether a YouTube link in an article points to the brand's own
+# channel. Leave empty to disallow ALL YouTube links in articles (recommended
+# default if you don't have a YouTube channel).
+# ORG_YT_CHANNEL_ID is the canonical channel ID (starts with "UC...").
+# ORG_YT_HANDLE is the @-handle (used only in human-readable references).
+ORG_YT_CHANNEL_ID = ""
+ORG_YT_HANDLE = ""
 DEFAULT_AUTHOR_NAME = "Author Name"
 DEFAULT_AUTHOR_URL = "https://example.com"
 DEFAULT_AUTHOR_JOB_TITLE = "Editor"
