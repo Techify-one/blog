@@ -1,0 +1,140 @@
+---
+import { PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE } from '~/lib/pagination';
+
+interface Props {
+  page: number;
+  total: number;
+  limit: number;
+  basePath: string; // e.g. "/" or "/categoria/ia-fundamentos"
+}
+
+const { page, total, limit, basePath } = Astro.props;
+const totalPages = Math.max(1, Math.ceil(total / limit));
+const hasPrev = page > 1;
+const hasNext = page < totalPages;
+
+// Garante trailing slash antes do `?…` pra cair no pattern `/blog/*`
+// do Cloudflare Worker. Sem isso, `/blog?page=2` vaza pro site apex
+// (Express) e devolve 404.
+const withTrailingSlash = basePath.endsWith('/') ? basePath : `${basePath}/`;
+
+const pageHref = (n: number): string => {
+  const params = new URLSearchParams();
+  if (n > 1) params.set('page', String(n));
+  if (limit !== DEFAULT_PAGE_SIZE) params.set('limit', String(limit));
+  const qs = params.toString();
+  return qs ? `${withTrailingSlash}?${qs}` : withTrailingSlash;
+};
+
+const windowSize = 2;
+const pages: (number | 'ellipsis')[] = [];
+for (let i = 1; i <= totalPages; i++) {
+  if (
+    i === 1 ||
+    i === totalPages ||
+    (i >= page - windowSize && i <= page + windowSize)
+  ) {
+    pages.push(i);
+  } else if (pages[pages.length - 1] !== 'ellipsis') {
+    pages.push('ellipsis');
+  }
+}
+
+const from = total > 0 ? Math.min((page - 1) * limit + 1, total) : 0;
+const to = total > 0 ? Math.min(page * limit, total) : 0;
+
+// Só mostra qualquer controle de paginação se há mais artigos do que
+// o menor tamanho de página. Abaixo disso, nem prev/next nem selector
+// fazem sentido — tudo cabe numa página.
+const smallestPageSize = PAGE_SIZE_OPTIONS[0];
+const showControls = total > smallestPageSize;
+---
+
+{
+  showControls && (
+    <nav
+      aria-label="Paginação"
+      class="mt-8 flex flex-col items-center gap-3 text-sm"
+    >
+      <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-slate-500">
+        {total > 0 && (
+          <span>
+            Mostrando {from}–{to} de {total} artigos
+          </span>
+        )}
+
+        <form
+          method="get"
+          action={withTrailingSlash}
+          class="flex items-center gap-2"
+        >
+          <label for="per-page" class="text-slate-600">
+            Por página:
+          </label>
+          <select
+            id="per-page"
+            name="limit"
+            onchange="this.form.submit()"
+            class="rounded border border-slate-300 bg-white px-2 py-1 text-slate-700"
+          >
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <option value={size} selected={size === limit}>
+                {size}
+              </option>
+            ))}
+          </select>
+          {/* Ao mudar o tamanho, sempre volta pra página 1. Não
+              reenviamos `page` — o default em `parsePage` é 1. */}
+        </form>
+      </div>
+
+      {totalPages > 1 && (
+        <div class="flex flex-wrap items-center justify-center gap-1">
+          {hasPrev ? (
+            <a
+              href={pageHref(page - 1)}
+              rel="prev"
+              class="px-2 py-1 text-slate-700 hover:underline"
+            >
+              ← Anterior
+            </a>
+          ) : (
+            <span class="px-2 py-1 text-slate-400">← Anterior</span>
+          )}
+
+          {pages.map((p) =>
+            p === 'ellipsis' ? (
+              <span class="px-2 py-1 text-slate-400">…</span>
+            ) : p === page ? (
+              <span
+                aria-current="page"
+                class="rounded bg-blue-600 px-3 py-1 font-medium text-white"
+              >
+                {p}
+              </span>
+            ) : (
+              <a
+                href={pageHref(p)}
+                class="rounded px-3 py-1 text-slate-700 hover:underline"
+              >
+                {p}
+              </a>
+            ),
+          )}
+
+          {hasNext ? (
+            <a
+              href={pageHref(page + 1)}
+              rel="next"
+              class="px-2 py-1 text-slate-700 hover:underline"
+            >
+              Próxima →
+            </a>
+          ) : (
+            <span class="px-2 py-1 text-slate-400">Próxima →</span>
+          )}
+        </div>
+      )}
+    </nav>
+  )
+}

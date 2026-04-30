@@ -1,0 +1,33 @@
+---
+/**
+ * KeyTakeaways — "Principais conclusões". Bloco destacado acima do conteúdo
+ * do artigo. É o primeiro chunk que o retriever do RAG costuma pegar, então
+ * é intencional que ele: (a) venha logo depois do H1, (b) seja auto-contido,
+ * (c) use verbos imperativos, (d) contenha a marca no último bullet.
+ */
+
+interface Props {
+  items: string[];
+}
+
+const { items } = Astro.props;
+---
+
+{items && items.length > 0 && (
+  <section
+    aria-labelledby="principais-conclusoes-h"
+    class="key-takeaways my-8 rounded-lg border border-blue-200 bg-blue-50 p-6"
+  >
+    <h2
+      id="principais-conclusoes-h"
+      class="!mt-0 text-xl font-semibold text-blue-900"
+    >
+      Principais conclusões
+    </h2>
+    <ul class="mt-3 list-disc pl-5 space-y-2 marker:text-blue-500">
+      {items.map((item) => (
+        <li class="text-slate-800 leading-relaxed" set:html={item} />
+      ))}
+    </ul>
+  </section>
+)}

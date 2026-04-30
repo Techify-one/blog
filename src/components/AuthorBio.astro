@@ -1,0 +1,102 @@
+---
+/**
+ * AuthorBio — bloco de autoridade no rodapé do artigo.
+ * Renderiza avatar, nome, cargo, bio, credenciais e redes sociais.
+ * Só deve ser montado pelo template quando o artigo é assinado pelo autor
+ * default (para evitar mostrar bio errada de um autor custom sem dados).
+ *
+ * Todos os dados vêm das vars do wrangler.toml (DEFAULT_AUTHOR_*) via
+ * getSiteConfig() — zero dependência do schema do D1.
+ */
+
+interface Props {
+  name: string;
+  url?: string;
+  jobTitle?: string;
+  bio: string;
+  avatarUrl?: string;
+  credentials?: string[];
+  sameAs?: string[];
+}
+
+const { name, url, jobTitle, bio, avatarUrl, credentials = [], sameAs = [] } = Astro.props;
+
+// Detecta tipo de rede social pelo host para escolher rótulo acessível.
+function socialLabel(href: string): string {
+  try {
+    const host = new URL(href).hostname.replace(/^www\./, '');
+    if (host.includes('linkedin')) return 'LinkedIn';
+    if (host === 'x.com' || host.includes('twitter')) return 'X';
+    if (host.includes('github')) return 'GitHub';
+    if (host.includes('instagram')) return 'Instagram';
+    if (host.includes('youtube')) return 'YouTube';
+    return host;
+  } catch {
+    return 'Link';
+  }
+}
+---
+
+<section
+  class="mt-12 border-t border-slate-200 pt-8"
+  aria-labelledby="sobre-o-autor-h"
+  itemscope
+  itemtype="https://schema.org/Person"
+>
+  <h2 id="sobre-o-autor-h" class="text-xl font-semibold mb-4">Sobre o autor</h2>
+  <div class="flex flex-col sm:flex-row gap-6 rounded-lg border border-slate-200 bg-slate-50 p-6">
+    {avatarUrl && (
+      <img
+        src={avatarUrl}
+        alt={name}
+        width="96"
+        height="96"
+        loading="lazy"
+        decoding="async"
+        class="w-24 h-24 rounded-full object-cover flex-shrink-0 border border-slate-200"
+        itemprop="image"
+      />
+    )}
+    <div class="flex-1 min-w-0">
+      <p class="m-0 text-lg font-semibold text-slate-900">
+        {url ? (
+          <a href={url} itemprop="url" class="no-underline hover:underline">
+            <span itemprop="name">{name}</span>
+          </a>
+        ) : (
+          <span itemprop="name">{name}</span>
+        )}
+      </p>
+      {jobTitle && (
+        <p class="mt-0 mb-2 text-sm text-slate-600" itemprop="jobTitle">{jobTitle}</p>
+      )}
+      {bio && (
+        <p class="my-2 text-slate-700 leading-relaxed" itemprop="description">{bio}</p>
+      )}
+      {credentials.length > 0 && (
+        <ul class="mt-3 space-y-1 pl-0 list-none">
+          {credentials.map((c) => (
+            <li class="text-sm text-slate-700 pl-6 relative before:content-['✓'] before:absolute before:left-0 before:text-blue-600 before:font-bold">
+              {c}
+            </li>
+          ))}
+        </ul>
+      )}
+      {sameAs.length > 0 && (
+        <p class="mt-4 flex flex-wrap gap-3 text-sm">
+          {sameAs.map((href) => (
+            <a
+              href={href}
+              rel="me noopener"
+              target="_blank"
+              itemprop="sameAs"
+              class="text-blue-700 hover:underline"
+            >
+              {socialLabel(href)}
+            </a>
+          ))}
+        </p>
+      )}
+    </div>
+  </div>
+</section>

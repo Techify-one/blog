@@ -1,0 +1,38 @@
+---
+/**
+ * TableOfContents — extrai H2s do HTML do artigo e monta um sumário navegável.
+ * Adiciona id aos H2s que não tenham, preservando o HTML original.
+ *
+ * Devolve duas coisas via `Astro.props.onContent`? Não — Astro não tem esse
+ * callback. Em vez disso, expomos uma função utilitária que o [slug].astro
+ * usa para derivar o HTML decorado E a lista de seções em uma única passada.
+ */
+
+interface TocItem {
+  id: string;
+  text: string;
+}
+
+interface Props {
+  items: TocItem[];
+}
+
+const { items } = Astro.props;
+---
+
+{items && items.length >= 3 && (
+  <nav aria-label="Sumário do artigo" class="my-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
+    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+      Neste artigo
+    </p>
+    <ol class="list-decimal pl-5 space-y-1 text-sm marker:text-slate-400">
+      {items.map((item) => (
+        <li>
+          <a href={`#${item.id}`} class="text-slate-700 hover:text-blue-700">
+            {item.text}
+          </a>
+        </li>
+      ))}
+    </ol>
+  </nav>
+)}

@@ -1,0 +1,29 @@
+# build outputs
+dist/
+.astro/
+.wrangler/
+
+# dependencies
+node_modules/
+
+# env
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+
+# os
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# cloudflare
+.dev.vars
+wrangler.toml

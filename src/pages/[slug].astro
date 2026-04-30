@@ -1,0 +1,247 @@
+---
+import Base from '~/layouts/Base.astro';
+import Breadcrumb from '~/components/Breadcrumb.astro';
+import AiShareButtons from '~/components/AiShareButtons.astro';
+import KeyTakeaways from '~/components/KeyTakeaways.astro';
+import FaqBlock from '~/components/FaqBlock.astro';
+import TableOfContents from '~/components/TableOfContents.astro';
+import CtaBlock from '~/components/CtaBlock.astro';
+import AuthorBio from '~/components/AuthorBio.astro';
+import { createDb } from '~/db/client';
+import { articles, categories } from '~/db/schema';
+import { and, desc, eq, ne } from 'drizzle-orm';
+import { getSiteConfig } from '~/lib/site';
+import {
+  articleJsonLd,
+  breadcrumbJsonLd,
+  faqPageJsonLd,
+  howToJsonLd,
+  computeReadingTime,
+} from '~/lib/structured-data';
+import { formatDatePtBr } from '~/lib/format';
+import { url } from '~/lib/paths';
+import { buildTocAndDecorate } from '~/lib/toc';
+import { isReservedSlug } from '~/lib/slug';
+
+export const prerender = false;
+
+const env = Astro.locals.runtime.env;
+const site = getSiteConfig(env);
+const db = createDb(env.DB);
+
+const slug = Astro.params.slug;
+if (!slug || isReservedSlug(slug, env.INDEXNOW_KEY)) {
+  return new Response('Not Found', { status: 404 });
+}
+
+const rows = await db
+  .select()
+  .from(articles)
+  .where(and(eq(articles.slug, slug), eq(articles.status, 'published')))
+  .limit(1);
+
+if (rows.length === 0) {
+  return new Response('Not Found', { status: 404 });
+}
+const article = rows[0]!;
+
+// Pull category display name and related articles in parallel.
+const [categoryRows, related] = await Promise.all([
+  article.category
+    ? db
+        .select()
+        .from(categories)
+        .where(eq(categories.slug, article.category))
+        .limit(1)
+    : Promise.resolve([]),
+  article.category
+    ? db
+        .select({
+          slug: articles.slug,
+          title: articles.title,
+          summary: articles.summary,
+        })
+        .from(articles)
+        .where(
+          and(
+            eq(articles.status, 'published'),
+            eq(articles.category, article.category),
+            ne(articles.id, article.id),
+          ),
+        )
+        .orderBy(desc(articles.published_at))
+        .limit(5)
+    : Promise.resolve([]),
+]);
+const category = categoryRows[0];
+
+const canonicalUrl = `${site.siteUrl}/${article.slug}`;
+const tags = Array.isArray(article.tags) ? article.tags : [];
+const keyTakeaways = Array.isArray(article.key_takeaways) ? article.key_takeaways : [];
+const faqItems = Array.isArray(article.faq) ? article.faq : [];
+const heroImage = article.hero_image_url || site.defaultHeroImageUrl;
+const readingTime = article.reading_time_min ?? computeReadingTime(article.content);
+
+// Decorate content HTML: inject ids into H2s and extract TOC.
+const { html: decoratedHtml, toc } = buildTocAndDecorate(article.content);
+
+const breadcrumbItems = [
+  { name: 'Início', href: site.siteUrl },
+  ...(category
+    ? [{ name: category.name, href: `${site.siteUrl}/categoria/${category.slug}` }]
+    : []),
+  { name: article.title },
+];
+
+const jsonLdNodes: Record<string, unknown>[] = [
+  articleJsonLd(article, site, category?.name),
+  breadcrumbJsonLd(
+    breadcrumbItems.map((item) => ({ name: item.name, url: item.href })),
+  ),
+];
+if (faqItems.length > 0) {
+  jsonLdNodes.push(faqPageJsonLd(faqItems));
+}
+const howToNode = howToJsonLd(article, site);
+if (howToNode) {
+  jsonLdNodes.push(howToNode);
+}
+
+const isDefaultAuthor = article.author_name === site.defaultAuthor.name;
+const showAuthorBio = Boolean(
+  isDefaultAuthor && (site.defaultAuthor.bio || site.defaultAuthor.avatarUrl),
+);
+---
+
+<Base
+  title={article.meta_title ?? article.title}
+  description={article.meta_description ?? article.summary}
+  canonical={canonicalUrl}
+  ogType="article"
+  ogImage={heroImage}
+  publishedTime={article.published_at ?? undefined}
+  modifiedTime={article.updated_at}
+  jsonLd={jsonLdNodes}
+  articleSection={category?.name}
+  articleTags={tags}
+  articleAuthor={article.author_name}
+>
+  <article class="mx-auto max-w-3xl px-4 py-10">
+    <Breadcrumb
+      items={breadcrumbItems.map((b) => ({ name: b.name, href: b.href }))}
+    />
+
+    <header class="mb-6">
+      <h1>{article.title}</h1>
+
+      {/* Summary block — primeiro chunk citável por AI Overviews.
+          A classe `summary-speakable` é alvo do SpeakableSpecification
+          emitido em Article JSON-LD. */}
+      <p
+        class="summary-speakable text-lg text-slate-700 leading-relaxed border-l-4 border-blue-500 pl-4 my-6"
+      >
+        <strong>{article.summary}</strong>
+      </p>
+
+      <div class="text-sm text-slate-500 flex flex-wrap gap-x-4 gap-y-1">
+        <span>
+          Por{' '}
+          {article.author_url ? (
+            <a href={article.author_url} rel="author">
+              {article.author_name}
+            </a>
+          ) : (
+            <span>{article.author_name}</span>
+          )}
+        </span>
+        {article.published_at && (
+          <span>
+            Publicado em{' '}
+            <time datetime={article.published_at}>
+              {formatDatePtBr(article.published_at)}
+            </time>
+          </span>
+        )}
+        {article.updated_at && article.updated_at !== article.published_at && (
+          <span>
+            Atualizado em{' '}
+            <time datetime={article.updated_at}>
+              {formatDatePtBr(article.updated_at)}
+            </time>
+          </span>
+        )}
+        {readingTime > 0 && (
+          <span aria-label="Tempo estimado de leitura">⏱ {readingTime} min de leitura</span>
+        )}
+      </div>
+    </header>
+
+    <AiShareButtons url={canonicalUrl} brand={site.siteName} />
+
+    {article.hero_image_url && (
+      <figure class="my-6">
+        <img
+          src={article.hero_image_url}
+          alt={article.title}
+          loading="eager"
+          decoding="async"
+          class="w-full rounded-lg border border-slate-200"
+        />
+      </figure>
+    )}
+
+    {keyTakeaways.length > 0 && <KeyTakeaways items={keyTakeaways} />}
+
+    <CtaBlock
+      variant="soft"
+      headline="Precisa disso implementado na sua operação?"
+      body={`A ${site.org.name} ajuda empresas a transformar IA aplicada e automação em vantagem competitiva real.`}
+      href={site.org.url}
+      label={`Fale com a ${site.org.name}`}
+    />
+
+    {toc.length >= 3 && <TableOfContents items={toc} />}
+
+    <div class="content max-w-none" set:html={decoratedHtml} />
+
+    {tags.length > 0 && (
+      <div class="mt-8 flex flex-wrap gap-2">
+        {tags.map((tag) => (
+          <span class="inline-block rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">
+            #{tag}
+          </span>
+        ))}
+      </div>
+    )}
+
+    {showAuthorBio && (
+      <AuthorBio
+        name={site.defaultAuthor.name}
+        url={site.defaultAuthor.url}
+        jobTitle={site.defaultAuthor.jobTitle}
+        bio={site.defaultAuthor.bio}
+        avatarUrl={site.defaultAuthor.avatarUrl}
+        credentials={site.defaultAuthor.credentials}
+        sameAs={site.defaultAuthor.sameAs}
+      />
+    )}
+
+    {faqItems.length > 0 && <FaqBlock items={faqItems} />}
+
+    {related.length > 0 && (
+      <aside class="mt-12 border-t border-slate-200 pt-8">
+        <h2 class="text-xl font-semibold mb-4">Artigos relacionados</h2>
+        <ul class="space-y-3">
+          {related.map((r) => (
+            <li>
+              <a href={url(`/${r.slug}`)} class="font-medium">
+                {r.title}
+              </a>
+              <p class="text-sm text-slate-600 mt-1">{r.summary}</p>
+            </li>
+          ))}
+        </ul>
+      </aside>
+    )}
+  </article>
+</Base>

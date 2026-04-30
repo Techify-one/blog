@@ -1,0 +1,61 @@
+# Cloudflare Workers configuration — template.
+#
+# Copy this file to `wrangler.toml` and fill in your own values:
+#   cp wrangler.toml.example wrangler.toml
+#
+# Before deploying:
+#   1. Run `wrangler d1 create blog-db` and replace database_id below.
+#   2. Run `wrangler secret put API_KEY`      (Bearer token for the API).
+#   3. Run `wrangler secret put INDEXNOW_KEY` (IndexNow key; also served at /{KEY}.txt).
+#   4. Run `npx astro build && wrangler deploy`.
+
+name = "blog"
+main = "./dist/_worker.js/index.js"
+compatibility_date = "2024-12-30"
+compatibility_flags = ["nodejs_compat"]
+
+# Uncomment and configure your routes. Example (custom domain via Cloudflare):
+# routes = [
+#   { pattern = "example.com/blog", zone_name = "example.com" },
+#   { pattern = "example.com/blog/*", zone_name = "example.com" },
+#   { pattern = "www.example.com/blog", zone_name = "example.com" },
+#   { pattern = "www.example.com/blog/*", zone_name = "example.com" }
+# ]
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+
+# Public vars — safe to commit in your own wrangler.toml.
+[vars]
+SITE_URL = "https://example.com/blog"
+SITE_NAME = "My Blog"
+SITE_DESCRIPTION = "A blog about technology."
+# Brand/organization name — used in CTAs and Organization JSON-LD.
+# Distinct from SITE_NAME (the publication name). Falls back to SITE_NAME if unset.
+ORG_NAME = "Acme"
+ORG_URL = "https://example.com"
+ORG_LOGO_URL = "https://example.com/logo.png"
+# Pipe-separated list of social/institutional URLs — emitted as Organization.sameAs
+# in JSON-LD. Leave empty if you have no profiles yet.
+# Ex.: "https://www.linkedin.com/company/acme|https://x.com/acme|https://github.com/acme"
+ORG_SAME_AS = ""
+ORG_DESCRIPTION = "Short description of your organization."
+DEFAULT_AUTHOR_NAME = "Author Name"
+DEFAULT_AUTHOR_URL = "https://example.com"
+DEFAULT_AUTHOR_JOB_TITLE = "Editor"
+# Pipe-separated sameAs URLs for the default author persona (LinkedIn, X, etc).
+DEFAULT_AUTHOR_SAME_AS = ""
+# Fallback used in og:image / Article.image when the article doesn't provide a hero_image_url.
+DEFAULT_HERO_IMAGE_URL = "https://example.com/logo.png"
+
+# D1 database binding. Replace database_id after running `wrangler d1 create blog-db`.
+[[d1_databases]]
+binding = "DB"
+database_name = "blog-db"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+migrations_dir = "drizzle"
+
+# Observability (optional but recommended).
+[observability]
+enabled = true

@@ -1,0 +1,152 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  body {
+    @apply bg-white text-slate-900 antialiased;
+  }
+
+  a {
+    @apply text-blue-700 underline-offset-4 hover:underline;
+  }
+
+  article h1 {
+    @apply text-4xl font-bold tracking-tight mt-0 mb-4;
+  }
+
+  article h2 {
+    @apply text-2xl font-semibold tracking-tight mt-10 mb-3;
+  }
+
+  article h3 {
+    @apply text-xl font-semibold tracking-tight mt-8 mb-2;
+  }
+
+  article p {
+    @apply my-4 leading-7;
+  }
+
+  article ul,
+  article ol {
+    @apply my-4 pl-6;
+  }
+
+  article ul {
+    @apply list-disc;
+  }
+
+  article ol {
+    @apply list-decimal;
+  }
+
+  article li {
+    @apply my-1;
+  }
+
+  article blockquote {
+    @apply border-l-4 border-slate-300 pl-4 italic text-slate-700 my-4;
+  }
+
+  article code {
+    @apply bg-slate-100 px-1 py-0.5 rounded text-sm font-mono;
+  }
+
+  article pre {
+    @apply bg-slate-900 text-slate-100 p-4 rounded-md overflow-x-auto my-4 text-sm;
+  }
+
+  article pre code {
+    @apply bg-transparent p-0 text-inherit;
+  }
+
+  article table {
+    @apply w-full border-collapse my-6 text-sm;
+  }
+
+  article th,
+  article td {
+    @apply border border-slate-300 px-3 py-2 text-left;
+  }
+
+  article th {
+    @apply bg-slate-100 font-semibold;
+  }
+
+  /* ── GEO/AEO inline blocks (usados dentro do HTML do articles.content) ── */
+
+  /* CTA distribuído no corpo do artigo */
+  .content .cta-inline {
+    @apply my-8 p-6 rounded-md border-l-4 border-amber-500 bg-amber-50;
+  }
+  .content .cta-inline h3 {
+    @apply mt-0 mb-2 text-lg font-semibold;
+  }
+  .content .cta-inline p {
+    @apply my-2;
+  }
+  .content .cta-inline a {
+    @apply inline-block mt-2 px-4 py-2 rounded-md bg-blue-600 text-white font-semibold no-underline hover:bg-blue-700 hover:no-underline;
+  }
+
+  /* Case study box — métrica concreta + descrição */
+  .content .case-study {
+    @apply my-8 p-6 rounded-lg border-2 border-slate-200 bg-white;
+  }
+  .content .case-study .label {
+    @apply block uppercase text-xs tracking-widest text-slate-500 font-bold mb-2;
+  }
+  .content .case-study .metric {
+    @apply text-3xl font-extrabold text-blue-600 leading-tight my-2;
+  }
+
+  /* Stat callout — número quantificado destacado inline no parágrafo.
+     Flui com o texto: não quebra linha nem cria caixa flutuante. */
+  .content .stat-callout {
+    @apply bg-blue-50 rounded px-1.5 py-0.5;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+  .content .stat-callout strong {
+    @apply text-blue-600 font-bold;
+  }
+
+  /* Variante em bloco — use quando quiser o destaque grande tipo card,
+     fora de parágrafo: <aside class="stat-callout-block">. */
+  .content .stat-callout-block {
+    @apply block px-4 py-3 my-4 rounded-md bg-blue-50 border-l-4 border-blue-500;
+  }
+  .content .stat-callout-block strong {
+    @apply block text-3xl text-blue-600 leading-none font-bold mb-1;
+  }
+
+  /* Tabela de comparação — ganha header azul */
+  .content table.comparison thead {
+    @apply bg-blue-100;
+  }
+  .content table.comparison tbody tr:nth-child(even) {
+    @apply bg-slate-50;
+  }
+  .content table.comparison tbody td:first-child {
+    @apply font-semibold;
+  }
+
+  /* Urgency note — parágrafo de urgência suave */
+  .content .urgency-note {
+    @apply italic text-amber-700 pl-6 relative;
+  }
+  .content .urgency-note::before {
+    content: "⚠";
+    @apply absolute left-0 top-0;
+  }
+}

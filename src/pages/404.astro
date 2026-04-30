@@ -1,0 +1,22 @@
+---
+import Base from '~/layouts/Base.astro';
+import { getSiteConfig } from '~/lib/site';
+import { url } from '~/lib/paths';
+
+export const prerender = false;
+
+const env = Astro.locals.runtime.env;
+const site = getSiteConfig(env);
+---
+
+<Base
+  title={`Página não encontrada — ${site.siteName}`}
+  description="O conteúdo que você procurou não foi encontrado."
+  noindex
+>
+  <section class="mx-auto max-w-3xl px-4 py-20 text-center">
+    <h1 class="text-4xl font-bold mb-3">404</h1>
+    <p class="text-slate-600 mb-6">A página que você procura não existe ou foi removida.</p>
+    <a href={url('/')} class="font-medium">← Voltar para o início</a>
+  </section>
+</Base>

@@ -1,0 +1,43 @@
+---
+/**
+ * CtaBlock — bloco de call-to-action reusável.
+ * Usado no template do artigo logo após o KeyTakeaways (variant="soft")
+ * para cumprir o padrão GEO/AEO de ter um CTA visível pré-corpo sem
+ * tirar o foco da leitura.
+ *
+ * CTAs distribuídos dentro do corpo do artigo NÃO usam este componente —
+ * eles vêm como HTML inline (`<aside class="cta-inline">`) no próprio
+ * `articles.content`, via skill de geração.
+ */
+
+interface Props {
+  variant?: 'soft' | 'strong';
+  headline: string;
+  body: string;
+  href: string;
+  label: string;
+}
+
+const { variant = 'soft', headline, body, href, label } = Astro.props;
+
+const containerClass =
+  variant === 'strong'
+    ? 'my-8 p-6 rounded-lg bg-blue-600 text-white'
+    : 'my-8 p-6 rounded-lg border-l-4 border-blue-500 bg-blue-50';
+
+const headlineClass =
+  variant === 'strong' ? 'mt-0 mb-2 text-xl font-semibold' : 'mt-0 mb-2 text-xl font-semibold text-blue-900';
+
+const bodyClass = variant === 'strong' ? 'mb-4 text-white/90' : 'mb-4 text-slate-700';
+
+const buttonClass =
+  variant === 'strong'
+    ? 'inline-block px-5 py-2.5 rounded-md bg-white text-blue-700 font-semibold no-underline hover:bg-slate-100 hover:no-underline'
+    : 'inline-block px-5 py-2.5 rounded-md bg-blue-600 text-white font-semibold no-underline hover:bg-blue-700 hover:no-underline';
+---
+
+<aside class={containerClass} role="complementary">
+  <h3 class={headlineClass}>{headline}</h3>
+  <p class={bodyClass}>{body}</p>
+  <a href={href} class={buttonClass}>{label}</a>
+</aside>

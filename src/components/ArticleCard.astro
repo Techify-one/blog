@@ -1,0 +1,38 @@
+---
+import { formatDatePtBr } from '~/lib/format';
+import { url } from '~/lib/paths';
+import type { Article } from '~/db/schema';
+
+interface Props {
+  article: Pick<
+    Article,
+    'slug' | 'title' | 'summary' | 'category' | 'published_at' | 'author_name'
+  >;
+}
+
+const { article } = Astro.props;
+---
+
+<article class="border-b border-slate-200 py-6 last:border-b-0">
+  <h2 class="text-xl font-semibold tracking-tight mb-1">
+    <a href={url(`/${article.slug}`)} class="text-slate-900 no-underline hover:text-blue-700">
+      {article.title}
+    </a>
+  </h2>
+  <p class="text-slate-700 mb-2">{article.summary}</p>
+  <div class="text-xs text-slate-500 flex flex-wrap gap-3">
+    {
+      article.category && (
+        <a href={url(`/categoria/${article.category}`)} class="uppercase tracking-wide">
+          {article.category}
+        </a>
+      )
+    }
+    {
+      article.published_at && (
+        <time datetime={article.published_at}>{formatDatePtBr(article.published_at)}</time>
+      )
+    }
+    <span>{article.author_name}</span>
+  </div>
+</article>
